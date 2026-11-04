@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fixkosten Manager</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#121212">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 20px; color: #ffffff; text-align: center; }
+    .card {
+      background: #1e1e1e;
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    label { font-size: 0.85rem; color: #a0a0a0; display: block; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #2a2a2a;
+      color: #fff;
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: #007aff;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:active { background: #0056b3; }
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .list-item:last-child { border-bottom: none; }
+    .delete-btn {
+      background: #ff3b30;
+      border: none;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      width: auto;
+      margin-bottom: 0;
+    }
+    .summary-val { font-size: 1.8rem; font-weight: bold; color: #34c759; margin-top: 4px; }
+    .summary-neg { color: #ff3b30; }
+  </style>
+</head>
+<body>
+
+  <h1>Fixkosten Manager</h1>
+
+  <!-- Kontostand / Einnahmen -->
+  <div class="card">
+    <label for="kontostand">Monatliches Nettoeinkommen (€)</label>
+    <input type="number" id="kontostand" placeholder="z. B. 2500" step="0.01" onchange="speichereEinkommen()">
+    
+    <label>Restbetrag nach Fixkosten</label>
+    <div id="restbetrag" class="summary-val">0,00 €</div>
+  </div>
+
+  <!-- Neue Fixkosten hinzufügen -->
+  <div class="card">
+    <label for="bezeichnung">Neuer Posten (Name)</label>
+    <input type="text" id="bezeichnung" placeholder="z. B. Miete, Strom, Internet">
+    
+    <label for="betrag">Betrag (€)</label>
+    <input type="number" id="betrag" placeholder="z. B. 750.00" step="0.01">
+    
+    <button onclick="postenHinzufuegen()">Hinzufügen</button>
+  </div>
+
+  <!-- Liste der Fixkosten -->
+  <div class="card">
+    <label>Deine Fixkosten</label>
+    <div id="kostenListe"></div>
+  </div>
+
+  <script>
+    // Daten beim Start aus dem localStorage laden
+    let fixkosten = JSON.parse(localStorage.getItem('my_fixkosten')) || [];
+    let einkommen = parseFloat(localStorage.getItem('my_einkommen')) || 0;
+
+    document.getElementById('kontostand').value = einkommen ? einkommen : '';
+
+    function speichereEinkommen() {
+      const val = parseFloat(document.getElementById('kontostand').value) || 0;
+      einkommen = val;
+      localStorage.setItem('my_einkommen', einkommen);
+      renderUI();
+    }
+
+    function postenHinzufuegen() {
+      const nameInput = document.getElementById('bezeichnung');
+      const betragInput = document.getElementById('betrag');
+
+      const name = nameInput.value.trim();
+      const betrag = parseFloat(betragInput.value);
+
+      if (!name || isNaN(betrag) || betrag <= 0) {
+        alert('Bitte gib einen gültigen Namen und Betrag ein.');
+        return;
+      }
+
+      fixkosten.push({ id: Date.now(), name: name, betrag: betrag });
+      localStorage.setItem('my_fixkosten', JSON.stringify(fixkosten));
+
+      nameInput.value = '';
+      betragInput.value = '';
+      renderUI();
+    }
+
+    function postenLoeschen(id) {
+      fixkosten = fixkosten.filter(item => item.id !== id);
+      localStorage.setItem('my_fixkosten', JSON.stringify(fixkosten));
+      renderUI();
+    }
+
+    function renderUI() {
+      const liste = document.getElementById('kostenListe');
+      liste.innerHTML = '';
+
+      let gesamtFixkosten = 0;
+
+      if (fixkosten.length === 0) {
+        liste.innerHTML = '<p style="color: #666; font-size: 0.9rem;">Noch keine Fixkosten eingetragen.</p>';
+      } else {
+        fixkosten.forEach(item => {
+          gesamtFixkosten += item.betrag;
+          const div = document.createElement('div');
+          div.className = 'list-item';
+          div.innerHTML = `
+            <div>
+              <strong>${item.name}</strong><br>
+              <span style="color: #aaa; font-size: 0.9rem;">${item.betrag.toFixed(2)} €</span>
+            </div>
+            <button class="delete-btn" onclick="postenLoeschen(${item.id})">Löschen</button>
+          `;
+          liste.appendChild(div);
+        });
+      }
+
+      const rest = einkommen - gesamtFixkosten;
+      const restEl = document.getElementById('restbetrag');
+      restEl.textContent = rest.toFixed(2) + ' €';
+
+      if (rest < 0) {
+        restEl.className = 'summary-val summary-neg';
+      } else {
+        restEl.className = 'summary-val';
+      }
+    }
+
+    // Initiales Rendern
+    renderUI();
+
+    // Service Worker Registrierung (falls vorhanden)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
